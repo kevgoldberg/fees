@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Weekly Cleanup & Setup</title>
+  </head>
+  <body>
+    <h1>Weekly Cleanup & Setup</h1>
+    <style>
+      .drop-area {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        width: 100%;
+        max-width: 400px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+        cursor: pointer;
+      }
+      .drop-area.highlight {
+        border-color: #666;
+        background-color: #f8f8f8;
+      }
+      input[type=file] {
+        display: none;
+      }
+    </style>
+    <form method="post" enctype="multipart/form-data">
+      <!-- Query file upload -->
+      <div id="drop-query" class="drop-area">
+        <p>Drag & drop the JNM - Cash Balance Data Comparison file here, or click to select</p>
+        <input type="file" id="queryElem" name="query_file" accept=".xlsx,.csv" required>
+      </div>
+      <!-- Report file upload -->
+      <div id="drop-report" class="drop-area">
+        <p>Drag & drop the SlickGridExport_JNM(#) file here, or click to select</p>
+        <input type="file" id="reportElem" name="report_file" accept=".xlsx,.csv" required>
+      </div>
+      <label>Week #: <input type="number" name="week" min="1" required></label><br><br>
+      <button type="submit">Process</button>
+    </form>
+    <script>
+      function setupDrop(areaId, inputId) {
+        const dropArea = document.getElementById(areaId);
+        const fileInput = document.getElementById(inputId);
+        const prompt = dropArea.querySelector('p');
+        ['dragenter','dragover','dragleave','drop'].forEach(evt => {
+          dropArea.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        ['dragenter','dragover'].forEach(evt => dropArea.addEventListener(evt, () => dropArea.classList.add('highlight')));
+        ['dragleave','drop'].forEach(evt => dropArea.addEventListener(evt, () => dropArea.classList.remove('highlight')));
+        dropArea.addEventListener('drop', e => {
+          const files = e.dataTransfer.files;
+          if (files.length) {
+            fileInput.files = files;
+            prompt.textContent = files[0].name;
+          }
+        });
+        dropArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+          if (fileInput.files.length) prompt.textContent = fileInput.files[0].name;
+        });
+      }
+      setupDrop('drop-query','queryElem');
+      setupDrop('drop-report','reportElem');
+    </script>
+  </body>
+</html>
