@@ -2,6 +2,7 @@ from flask import Flask
 import pytest
 import pandas as pd
 from io import BytesIO
+from openpyxl import load_workbook
 from app.workbook_processor import process_workbook
 
 def test_process_workbook_valid_data():
