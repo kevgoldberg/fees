@@ -14,9 +14,17 @@ def process_workbook(stream, week: int) -> BytesIO:
     rb = wb[f"Report Batch Week {week}"]
 
     df_cf = pd.DataFrame(cf.values)
+    df_rb = pd.DataFrame(rb.values)
+
+    # If either sheet is empty, return workbook unchanged
+    if df_cf.empty or df_rb.empty:
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output
+
     df_cf.columns = df_cf.iloc[0]
     df_cf = df_cf[1:]
-    df_rb = pd.DataFrame(rb.values)
     df_rb.columns = df_rb.iloc[0]
     df_rb = df_rb[1:]
 
