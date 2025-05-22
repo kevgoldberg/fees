@@ -1,4 +1,5 @@
-from flask import Flask, request, render_template, send_file
+from flask import Flask, request, render_template, send_file, abort
+from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -159,18 +160,42 @@ def process_workbook(stream, week: int) -> BytesIO:
     output.seek(0)
     return output
 
-@app.route('/', methods=['GET','POST'])
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    """Handle file upload and processing."""
     if request.method == 'POST':
-        f = request.files['workbook']
-        week = int(request.form['week'])
-        result = process_workbook(f, week)
+        query_file = request.files.get('query_file')
+        report_file = request.files.get('report_file')
+        week = int(request.form.get('week', 0) or 0)
+
+        # Validate files
+        if not query_file or not query_file.filename:
+            abort(400, 'Query file is required')
+        if not report_file or not report_file.filename:
+            abort(400, 'Report file is required')
+
+        # Save the uploaded files into separate folders
+        project_root = Path(__file__).resolve().parent
+        qdir = project_root / 'Query'
+        rdir = project_root / 'Report'
+        qdir.mkdir(exist_ok=True)
+        rdir.mkdir(exist_ok=True)
+        qpath = qdir / query_file.filename
+        query_file.save(str(qpath))
+        rpath = rdir / report_file.filename
+        report_file.save(str(rpath))
+
+        # Process the query workbook
+        with open(qpath, 'rb') as f:
+            result = process_workbook(f, week)
+
         return send_file(
             result,
             as_attachment=True,
             download_name='processed.xlsx',
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
     return render_template('index.html')
 
 if __name__ == '__main__':
