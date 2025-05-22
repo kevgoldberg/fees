@@ -42,9 +42,9 @@ def process_workbook(stream, week: int) -> BytesIO:
 
     # Sort and populate
     df_cf.sort_values(by="Annualized Fee %", ascending=False, inplace=True)
-    df_cf["Email Status"] = df_cf["Account Number"].map(
-        df_rb.set_index("Account Number")["Email Status"]
-    )
+    if "Email Status" in df_rb.columns:
+        email_map = df_rb.set_index("Account Number")["Email Status"]
+        df_cf["Email Status"] = df_cf["Account Number"].map(email_map)
     if week > 1:
         df_prev = pd.DataFrame(wb[f"Cash Funding Week {prev}"].values)
         df_prev.columns = df_prev.iloc[0]
@@ -55,8 +55,15 @@ def process_workbook(stream, week: int) -> BytesIO:
             )
 
     # Determine Qualified? from reference sheet
-    ws_ref = wb["DO NOT DELETE"]
-    quals = {row[2] for row in ws_ref.iter_rows(min_row=2, values_only=True) if row[2]}
+    if "DO NOT DELETE" in wb.sheetnames:
+        ws_ref = wb["DO NOT DELETE"]
+        quals = {
+            row[2]
+            for row in ws_ref.iter_rows(min_row=2, values_only=True)
+            if row[2]
+        }
+    else:
+        quals = set()
     df_cf["Qualified?"] = df_cf["Account Type"].apply(
         lambda x: "Qualified" if x in quals else "Non-Qualified"
     )
@@ -100,18 +107,30 @@ def process_workbook(stream, week: int) -> BytesIO:
     pay_col = header_map.get('Pay Method')
     qual_col = header_map.get('Qualified?')
     fee_col = header_map.get('Annualized Fee %')
-    for r in range(2, cf.max_row+1):
-        if (cf.cell(r, fee_col).value or 0) > 0.0267 and cf.cell(r, qual_col).value == 'Qualified':
-            for c in range(1, cf.max_column+1): cf.cell(r,c).fill = yellow
-        diff = cf.cell(r, diff_col).value
-        if diff and diff < 0 and cf.cell(r, pay_col).value != 'Check':
-            for c in range(1, cf.max_column+1): cf.cell(r,c).font = red_font
+    for r in range(2, cf.max_row + 1):
+        fee_val = cf.cell(r, fee_col).value if fee_col else 0
+        qual_val = cf.cell(r, qual_col).value if qual_col else None
+        if fee_col and qual_col and fee_val > 0.0267 and qual_val == 'Qualified':
+            for c in range(1, cf.max_column + 1):
+                cf.cell(r, c).fill = yellow
+        if diff_col and pay_col:
+            diff = cf.cell(r, diff_col).value
+            pay_val = cf.cell(r, pay_col).value
+            if diff and diff < 0 and pay_val != 'Check':
+                for c in range(1, cf.max_column + 1):
+                    cf.cell(r, c).font = red_font
 
-    for name, width in [("Account Number",20), ("Household Full Name",42), ("Household Last Name",25)]:
+    for name, width in [
+        ("Account Number", 20),
+        ("Household Full Name", 42),
+        ("Household Last Name", 25),
+    ]:
         idx = header_map.get(name)
-        cf.column_dimensions[get_column_letter(idx)].width = width
+        if idx:
+            cf.column_dimensions[get_column_letter(idx)].width = width
 
-    wb["DO NOT DELETE"].sheet_state = 'hidden'
+    if "DO NOT DELETE" in wb.sheetnames:
+        wb["DO NOT DELETE"].sheet_state = 'hidden'
     cf.freeze_panes = "A2"
     rb.freeze_panes = "A2"
 
